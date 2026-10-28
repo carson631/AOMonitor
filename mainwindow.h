@@ -21,7 +21,7 @@ public:
     ~MainWindow() override;
 
 private slots:
-    void on_refreshButton_clicked();
+    void on_refreshButton_clicked();    // 刷新串口
     void on_openButton_clicked();       // 打开/关闭串口（二次点击为关闭）
     void on_searchButton_clicked();     // 主动要一帧：发任意字节，STM32 立即补发（并入库）
     void on_exportButton_clicked();     // 导出数据库为 CSV
