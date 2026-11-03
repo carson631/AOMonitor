@@ -6,262 +6,619 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>820</width>
-    <height>620</height>
+    <width>1200</width>
+    <height>800</height>
    </rect>
   </property>
   <property name="minimumSize">
    <size>
-    <width>660</width>
-    <height>520</height>
+    <width>1000</width>
+    <height>680</height>
    </size>
   </property>
   <property name="windowTitle">
-   <string>STM32光敏传感器</string>
+   <string>STM32 光照采集上位机</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="mainLayout">
     <property name="leftMargin">
-     <number>16</number>
+     <number>20</number>
     </property>
     <property name="topMargin">
-     <number>14</number>
-    </property>
-    <property name="rightMargin">
      <number>16</number>
     </property>
+    <property name="rightMargin">
+     <number>20</number>
+    </property>
     <property name="bottomMargin">
-     <number>12</number>
+     <number>8</number>
     </property>
     <property name="spacing">
-     <number>10</number>
+     <number>14</number>
     </property>
     <item>
-     <layout class="QGridLayout" name="formGrid">
-      <property name="horizontalSpacing">
-       <number>10</number>
-      </property>
-      <property name="verticalSpacing">
+     <layout class="QHBoxLayout" name="headerRow">
+      <property name="spacing">
        <number>12</number>
       </property>
-      <item row="0" column="0">
-       <widget class="QLabel" name="label_2">
-        <property name="text">
-         <string>串口：</string>
+      <item>
+       <layout class="QVBoxLayout" name="titleBox">
+        <property name="spacing">
+         <number>3</number>
         </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <layout class="QHBoxLayout" name="portRowLayout">
         <item>
-         <widget class="QComboBox" name="chuankouBox">
-          <property name="minimumSize">
-           <size>
-            <width>300</width>
-            <height>0</height>
-           </size>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="refreshButton">
+         <widget class="QLabel" name="titleLabel">
           <property name="text">
-           <string>刷新</string>
+           <string>光照采集上位机</string>
           </property>
          </widget>
         </item>
         <item>
-         <spacer name="portRowSpacer">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
+         <widget class="QLabel" name="subtitleLabel">
+          <property name="text">
+           <string>STM32F103 · 光敏 AO · 串口实时波形 · SQLite 采样记录</string>
           </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>40</width>
-            <height>20</height>
-           </size>
-          </property>
-         </spacer>
+         </widget>
         </item>
        </layout>
       </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="label_3">
-        <property name="text">
-         <string>波特率：</string>
+      <item>
+       <spacer name="headerSpacer">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
         </property>
-       </widget>
-      </item>
-      <item row="1" column="1">
-       <layout class="QHBoxLayout" name="baudRowLayout">
-        <item>
-         <widget class="QComboBox" name="botelvBox">
-          <property name="minimumSize">
-           <size>
-            <width>300</width>
-            <height>0</height>
-           </size>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="openButton">
-          <property name="text">
-           <string>打开串口</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <spacer name="baudRowSpacer">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>40</width>
-            <height>20</height>
-           </size>
-          </property>
-         </spacer>
-        </item>
-       </layout>
-      </item>
-      <item row="2" column="0">
-       <widget class="QLabel" name="label">
-        <property name="text">
-         <string>AO光照采样值：</string>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="1">
-       <widget class="QLCDNumber" name="AONumber">
-        <property name="minimumSize">
+        <property name="sizeHint" stdset="0">
          <size>
-          <width>90</width>
-          <height>28</height>
+          <width>40</width>
+          <height>20</height>
          </size>
         </property>
-        <property name="maximumSize">
-         <size>
-          <width>160</width>
-          <height>16777215</height>
-         </size>
-        </property>
-        <property name="digitCount">
-         <number>4</number>
-        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QFrame" name="statusPill">
+        <layout class="QHBoxLayout" name="statusPillLayout">
+         <property name="leftMargin">
+          <number>12</number>
+         </property>
+         <property name="topMargin">
+          <number>4</number>
+         </property>
+         <property name="rightMargin">
+          <number>10</number>
+         </property>
+         <property name="bottomMargin">
+          <number>4</number>
+         </property>
+         <property name="spacing">
+          <number>6</number>
+         </property>
+         <item>
+          <widget class="QLabel" name="statusDot">
+           <property name="text">
+            <string>●</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="statusLabel">
+           <property name="text">
+            <string>串口未连接</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
        </widget>
       </item>
      </layout>
     </item>
     <item>
-     <widget class="QChartView" name="chartArea" native="true">
-      <property name="minimumSize">
-       <size>
-        <width>0</width>
-        <height>220</height>
-       </size>
-      </property>
+     <widget class="QFrame" name="deviceCard">
+      <layout class="QHBoxLayout" name="deviceLayout">
+       <property name="leftMargin">
+        <number>16</number>
+       </property>
+       <property name="topMargin">
+        <number>10</number>
+       </property>
+       <property name="rightMargin">
+        <number>16</number>
+       </property>
+       <property name="bottomMargin">
+        <number>10</number>
+       </property>
+       <property name="spacing">
+        <number>10</number>
+       </property>
+       <item>
+        <widget class="QLabel" name="label_2">
+         <property name="text">
+          <string>串口</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QComboBox" name="chuankouBox">
+         <property name="minimumSize">
+          <size>
+           <width>280</width>
+           <height>32</height>
+          </size>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="refreshButton">
+         <property name="text">
+          <string>刷新</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="deviceSpacer1">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Fixed</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>12</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_3">
+         <property name="text">
+          <string>波特率</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QComboBox" name="botelvBox">
+         <property name="minimumSize">
+          <size>
+           <width>120</width>
+           <height>32</height>
+          </size>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="openButton">
+         <property name="text">
+          <string>打开串口</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="deviceSpacer2">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QLabel" name="deviceHint">
+         <property name="text">
+          <string>8 数据位 · 无校验 · 1 停止位</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
      </widget>
     </item>
     <item>
-     <layout class="QHBoxLayout" name="queryRowLayout">
+     <layout class="QHBoxLayout" name="chartSplitLayout">
+      <property name="spacing">
+       <number>14</number>
+      </property>
       <item>
-       <widget class="QLabel" name="label_4">
-        <property name="text">
-         <string>查询到的AO光照采样值：</string>
-        </property>
+       <widget class="QFrame" name="chartCard">
+        <layout class="QVBoxLayout" name="chartCardLayout">
+         <property name="leftMargin">
+          <number>14</number>
+         </property>
+         <property name="topMargin">
+          <number>10</number>
+         </property>
+         <property name="rightMargin">
+          <number>14</number>
+         </property>
+         <property name="bottomMargin">
+          <number>10</number>
+         </property>
+         <property name="spacing">
+          <number>8</number>
+         </property>
+         <item>
+          <layout class="QHBoxLayout" name="chartHeaderRow">
+           <property name="spacing">
+            <number>8</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="chartTitle">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Maximum" vsizetype="Fixed"/>
+             </property>
+             <property name="text">
+              <string>QtCharts 波形</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="badgeCpu">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Maximum" vsizetype="Fixed"/>
+             </property>
+             <property name="text">
+              <string>CPU 光栅化</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="chartHeaderSpacer">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QChartView" name="chartArea" native="true">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Expanding" vsizetype="Expanding"/>
+           </property>
+           <property name="minimumSize">
+            <size>
+             <width>320</width>
+             <height>260</height>
+            </size>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="chartStat">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Maximum" vsizetype="Fixed"/>
+           </property>
+           <property name="text">
+            <string>— fps / 处理 — ms/帧</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
        </widget>
       </item>
       <item>
-       <widget class="QLCDNumber" name="AONumber_2">
-        <property name="minimumSize">
-         <size>
-          <width>90</width>
-          <height>28</height>
-         </size>
-        </property>
-        <property name="maximumSize">
-         <size>
-          <width>160</width>
-          <height>16777215</height>
-         </size>
-        </property>
-        <property name="digitCount">
-         <number>4</number>
-        </property>
+       <widget class="QFrame" name="glCard">
+        <layout class="QVBoxLayout" name="glCardLayout">
+         <property name="leftMargin">
+          <number>14</number>
+         </property>
+         <property name="topMargin">
+          <number>10</number>
+         </property>
+         <property name="rightMargin">
+          <number>14</number>
+         </property>
+         <property name="bottomMargin">
+          <number>10</number>
+         </property>
+         <property name="spacing">
+          <number>8</number>
+         </property>
+         <item>
+          <layout class="QHBoxLayout" name="glHeaderRow">
+           <property name="spacing">
+            <number>8</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="glTitle">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Maximum" vsizetype="Fixed"/>
+             </property>
+             <property name="text">
+              <string>OpenGL 波形</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="badgeGpu">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Maximum" vsizetype="Fixed"/>
+             </property>
+             <property name="text">
+              <string>GPU 着色器</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="glHeaderSpacer">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="WaveformGLWidget" name="glArea" native="true">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Expanding" vsizetype="Expanding"/>
+           </property>
+           <property name="minimumSize">
+            <size>
+             <width>320</width>
+             <height>260</height>
+            </size>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="glStat">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Maximum" vsizetype="Fixed"/>
+           </property>
+           <property name="text">
+            <string>— fps / 绘制 — ms/帧</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
        </widget>
-      </item>
-      <item>
-       <spacer name="queryRowSpacer">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
       </item>
      </layout>
     </item>
     <item>
-     <layout class="QHBoxLayout" name="buttonRowLayout">
-      <item>
-       <widget class="QPushButton" name="searchButton">
-        <property name="minimumSize">
-         <size>
-          <width>90</width>
-          <height>0</height>
-         </size>
-        </property>
-        <property name="text">
-         <string>查询一次</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="exportButton">
-        <property name="minimumSize">
-         <size>
-          <width>90</width>
-          <height>0</height>
-         </size>
-        </property>
-        <property name="text">
-         <string>导出数据</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="clearButton">
-        <property name="minimumSize">
-         <size>
-          <width>90</width>
-          <height>0</height>
-         </size>
-        </property>
-        <property name="text">
-         <string>清空数据</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <spacer name="buttonRowSpacer">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-     </layout>
+     <widget class="QFrame" name="dataCard">
+      <layout class="QHBoxLayout" name="dataLayout">
+       <property name="leftMargin">
+        <number>18</number>
+       </property>
+       <property name="topMargin">
+        <number>10</number>
+       </property>
+       <property name="rightMargin">
+        <number>18</number>
+       </property>
+       <property name="bottomMargin">
+        <number>10</number>
+       </property>
+       <property name="spacing">
+        <number>18</number>
+       </property>
+       <item>
+        <layout class="QVBoxLayout" name="curBlock">
+         <property name="spacing">
+          <number>0</number>
+         </property>
+         <item>
+          <widget class="QLabel" name="sectionLabel">
+           <property name="text">
+            <string>实时读数</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="curValueRow">
+           <property name="spacing">
+            <number>10</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="AONumber">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Fixed" vsizetype="Fixed"/>
+             </property>
+             <property name="minimumSize">
+              <size>
+               <width>120</width>
+               <height>48</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>—</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignLeft|Qt::AlignVCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="unitLabel">
+             <property name="text">
+              <string>／ 4095</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="curSpacer">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QFrame" name="vSep">
+         <property name="minimumSize">
+          <size>
+           <width>1</width>
+           <height>0</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>1</width>
+           <height>16777215</height>
+          </size>
+         </property>
+         <property name="frameShape">
+          <enum>QFrame::NoFrame</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QVBoxLayout" name="queryBlock">
+         <property name="spacing">
+          <number>0</number>
+         </property>
+         <item>
+          <widget class="QLabel" name="sectionLabel2">
+           <property name="text">
+            <string>最近一次查询</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="queryValueRow">
+           <property name="spacing">
+            <number>8</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="AONumber_2">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Maximum" vsizetype="Fixed"/>
+             </property>
+             <property name="minimumSize">
+              <size>
+               <width>90</width>
+               <height>38</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>—</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignLeft|Qt::AlignVCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="unitLabel2">
+             <property name="text">
+              <string>／ 4095</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="querySpacer">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <spacer name="dataSpacer">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QPushButton" name="searchButton">
+         <property name="minimumSize">
+          <size>
+           <width>96</width>
+           <height>34</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>查询一次</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="exportButton">
+         <property name="minimumSize">
+          <size>
+           <width>96</width>
+           <height>34</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>导出数据</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="clearButton">
+         <property name="minimumSize">
+          <size>
+           <width>96</width>
+           <height>34</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>清空数据</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="stressButton">
+         <property name="minimumSize">
+          <size>
+           <width>90</width>
+           <height>34</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>压测：关</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
     </item>
    </layout>
   </widget>
@@ -270,7 +627,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>820</width>
+     <width>1200</width>
      <height>22</height>
     </rect>
    </property>
@@ -282,6 +639,12 @@
    <class>QChartView</class>
    <extends>QWidget</extends>
    <header location="global">&lt;QtCharts/QChartView&gt;</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>WaveformGLWidget</class>
+   <extends>QWidget</extends>
+   <header>waveformglwidget.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

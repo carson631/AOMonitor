@@ -1,0 +1,283 @@
+/* ============================================================
+   AoMonitor 界面主题（深色卡片风格）
+   说明：只用 objectName / 类选择器，不动任何业务控件的行为。
+   ============================================================ */
+
+* {
+    font-family: "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+    font-size: 13px;
+}
+
+QMainWindow,
+QWidget#centralwidget {
+    background: qlineargradient(x1:0, y1:0, x2:0.25, y2:1,
+                                stop:0    #0b1220,
+                                stop:0.55 #0d1628,
+                                stop:1    #121e36);
+}
+
+QLabel {
+    color: #e8eefb;
+    background: transparent;
+}
+
+/* ---------------- 顶部标题 ---------------- */
+
+QLabel#titleLabel {
+    font-size: 21px;
+    font-weight: 700;
+    color: #f5f9ff;
+}
+
+QLabel#subtitleLabel {
+    font-size: 12px;
+    color: #7b8cad;
+}
+
+QFrame#statusPill {
+    background: #16223a;
+    border: 1px solid #22314f;
+    border-radius: 14px;
+    padding: 2px 4px;
+}
+
+QLabel#statusDot {
+    font-size: 15px;
+    color: #5b6b87;
+}
+
+QLabel#statusLabel {
+    font-size: 12px;
+    color: #a9b8d4;
+    padding-right: 6px;
+}
+
+/* ---------------- 卡片 ---------------- */
+
+QFrame#deviceCard,
+QFrame#dataCard {
+    background: #131d33;
+    border: 1px solid #202d49;
+    border-radius: 12px;
+}
+
+QFrame#chartCard,
+QFrame#glCard {
+    background: #0d1626;
+    border: 1px solid #1e2b45;
+    border-radius: 12px;
+}
+
+QFrame#vSep {
+    background: #22314f;
+    border: none;
+}
+
+/* ---------------- 卡片内文字 ---------------- */
+
+QLabel#chartTitle,
+QLabel#glTitle {
+    font-size: 13px;
+    font-weight: 600;
+    color: #dce7f9;
+}
+
+QLabel#badgeCpu,
+QLabel#badgeGpu {
+    font-size: 11px;
+    font-weight: 600;
+    color: #93a4c4;
+    background: #16233c;
+    border: 1px solid #26375a;
+    border-radius: 9px;
+    padding: 2px 9px;
+}
+
+QLabel#chartStat,
+QLabel#glStat {
+    font-family: Consolas, "DejaVu Sans Mono", "Courier New", monospace;
+    font-size: 12px;
+    color: #8093b6;
+}
+
+QLabel#sectionLabel,
+QLabel#sectionLabel2 {
+    font-size: 12px;
+    color: #7b8cad;
+}
+
+QLabel#AONumber {
+    font-family: Consolas, "DejaVu Sans Mono", "Courier New", monospace;
+    font-size: 40px;
+    font-weight: 700;
+    color: #38bdf8;
+}
+
+QLabel#AONumber_2 {
+    font-family: Consolas, "DejaVu Sans Mono", "Courier New", monospace;
+    font-size: 28px;
+    font-weight: 700;
+    color: #34d399;
+}
+
+QLabel#unitLabel,
+QLabel#unitLabel2 {
+    font-size: 12px;
+    color: #6b7c9c;
+}
+
+QLabel#unitLabel {
+    padding-bottom: 6px;
+}
+
+QLabel#unitLabel2 {
+    padding-bottom: 6px;
+}
+
+QLabel#deviceHint {
+    font-size: 12px;
+    color: #6b7c9c;
+}
+
+/* ---------------- 按钮 ---------------- */
+
+QPushButton {
+    background: #1a2740;
+    border: 1px solid #283a5c;
+    border-radius: 8px;
+    color: #d7e3f8;
+    padding: 7px 14px;
+    min-height: 18px;
+}
+
+QPushButton:hover {
+    background: #22314f;
+    border-color: #3b5480;
+}
+
+QPushButton:pressed {
+    background: #15203a;
+}
+
+QPushButton:disabled {
+    color: #5a6a86;
+    border-color: #1c2740;
+    background: #141d2f;
+}
+
+QPushButton#openButton {
+    background: #1d6fd6;
+    border: 1px solid #2f8bf0;
+    color: #ffffff;
+    font-weight: 600;
+    min-width: 96px;
+}
+
+QPushButton#openButton:hover {
+    background: #2683ea;
+}
+
+QPushButton#openButton[connected="true"] {
+    background: #3a1f2a;
+    border-color: #7f3b4c;
+    color: #ffb0bf;
+}
+
+QPushButton#searchButton {
+    background: #0d3a4f;
+    border-color: #1a6f8f;
+    color: #a5e6ff;
+}
+
+QPushButton#searchButton:hover {
+    background: #104a64;
+    border-color: #2a93b8;
+}
+
+QPushButton#clearButton {
+    color: #ff9aa8;
+    border-color: #5a2f3c;
+}
+
+QPushButton#clearButton:hover {
+    background: #3a1f2a;
+    border-color: #8a4657;
+}
+
+/* ---------------- 下拉框 ---------------- */
+
+QComboBox {
+    background: #0e1729;
+    border: 1px solid #263450;
+    border-radius: 8px;
+    padding: 6px 10px;
+    color: #dfe9fa;
+    min-height: 18px;
+}
+
+QComboBox:hover {
+    border-color: #3d5b8c;
+}
+
+QComboBox:focus {
+    border-color: #38bdf8;
+}
+
+QComboBox::drop-down {
+    border: none;
+    width: 26px;
+}
+
+QComboBox QAbstractItemView {
+    background: #101c31;
+    border: 1px solid #263450;
+    border-radius: 8px;
+    color: #dfe9fa;
+    selection-background-color: #1d6fd6;
+    selection-color: #ffffff;
+    padding: 4px;
+    outline: none;
+}
+
+/* ---------------- 状态栏 / 提示 ---------------- */
+
+QStatusBar {
+    background: transparent;
+    color: #6f81a3;
+    border-top: 1px solid #1b2740;
+    font-size: 12px;
+}
+
+QStatusBar::item {
+    border: none;
+}
+
+QToolTip {
+    background: #101c31;
+    color: #dfe9fa;
+    border: 1px solid #263450;
+    padding: 4px;
+}
+
+/* ---------------- 滚动条 ---------------- */
+
+QScrollBar:vertical {
+    background: transparent;
+    width: 10px;
+    margin: 2px;
+}
+
+QScrollBar::handle:vertical {
+    background: #2a3a5a;
+    border-radius: 5px;
+    min-height: 28px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #3a4f78;
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    height: 0;
+}

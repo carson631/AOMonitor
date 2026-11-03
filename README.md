@@ -1,8 +1,22 @@
 # AoMonitor — STM32 光照强度采集上位机
 
 基于 **Qt 6 / Widgets** 的桌面串口上位机，配套 STM32F103C8T6 光敏采集节点：实时显示 ADC 光照值、绘制滚动波形、按需存库、导出 CSV。
+界面为深色仪表盘风格（QSS 主题化），并内置一条 **OpenGL + GLSL 着色器** 的波形渲染路径，与 QtCharts 并排跑同一份数据做性能对比。
 
 下位机固件代码见同级仓库 `STM32-LightSensor`（江协科技 9-2 工程改造：光敏 DO 控蜂鸣器 + AO 上 OLED + AO 串口上报）。
+
+---
+
+## 下载即用（Windows x64 免安装）
+
+| 版本 | 内容 | 链接 |
+|---|---|---|
+| **v1.1.0**（最新） | 深色界面 + OpenGL 双路波形对比 | [AoMonitor-1.1.0-win64.zip](https://github.com/carson631/AOMonitor/releases/latest) |
+| v1.0.0 | 首个可运行版本（功能可用、浅色界面） | [releases](https://github.com/carson631/AOMonitor/releases) |
+
+解压后直接双击 `AoMonitor.exe`，无需安装 Qt（运行时 DLL 已随包）。数据库 `ao_data.db` 会自动生成在同目录。
+
+> 直连 GitHub 下载慢时，可在地址前加镜像前缀：`https://gh-proxy.com/` + 原下载链接。
 
 ---
 
@@ -12,22 +26,94 @@
 |---|---|
 | **串口枚举** | 启动自动扫描，`QSerialPortInfo` 枚举，显示 `COM4 — USB-SERIAL CH340`；跨平台（Linux 显示 `/dev/ttyUSB0`），无需改代码 |
 | **打开 / 关闭串口** | 同一按钮二次点击为关闭；失败按错误类型给提示（`PermissionError` → 被其他程序占用，`DeviceNotFoundError` → 设备已拔出） |
-| **实时数值** | `AONumber` 显示每帧光照值（12 位 ADC，0~4095），约 5 帧/秒 |
+| **连接状态胶囊** | 右上角圆点 + 文字实时反映连接状态（绿点=已连接），按钮同步变红显示「关闭串口」 |
+| **实时数值** | 大号等宽数字显示每帧光照值（12 位 ADC，0~4095，四位定宽零填充，位数变化时不抖动），约 5 帧/秒 |
 | **滚动波形** | QtCharts `QLineSeries`，横轴窗口固定 300 点，满后整体左滚（示波器手感），纵轴 0~4095 |
-| **查询一次** | 向上位机发一个字节，STM32 收到任意字节立即补发一帧 → 立刻刷新 `AONumber_2` 并写入数据库 |
+| **OpenGL 双路对比** | 并排一个 `QOpenGLWidget` 波形（VAO + VBO + GLSL），同一份数据、各自卡片脚注显示 fps 与单帧耗时；「压测」按钮三档调节数据率 |
+| **查询一次** | 向上位机发一个字节，STM32 收到任意字节立即补发一帧 → 立刻刷新查询值并写入数据库 |
 | **按需入库** | SQLite 单文件 `ao_data.db`，**只有点「查询一次」的那一帧才入库**，200 ms 自动帧不落库，避免刷屏 |
 | **导出 CSV** | 全表导出，UTF-8 + BOM，Excel 打开中文不乱码 |
 | **清空数据** | 二次确认后 `DELETE FROM light_log` |
+| **深色主题** | 全部观感集中在 `theme.qss`（卡片/圆角/字号/按钮层级）+ Fusion 深色调色板，改配色只需动一个文件 |
 
 ---
 
 ## 界面截图
 
-<!-- 把截图保存为 docs/screenshot.png 后，下面这张图会自动显示 -->
-
 ![界面截图](docs/screenshot.png)
 
-> 截图位：运行程序、打开串口、遮挡/移开光源后截一张图，存为 `docs/screenshot.png` 即可。
+> 布局：标题栏（标题 / 副标题 / 连接状态胶囊）→ 串口设备卡片 → 左右波形卡片（QtCharts / OpenGL）→ 数据卡片（实时读数 / 最近一次查询 / 操作按钮）。
+
+---
+
+## 界面主题怎么做的
+
+分两层，**样式与业务完全解耦**：所有控件 objectName 保持原样，QSS 只按 `#objectName` 选择器改外观，没有为美观改动任何逻辑。
+
+| 层 | 位置 | 负责什么 |
+|---|---|---|
+| 调色板 | `main.cpp: applyTheme()` | Fusion 风格 + 完整深色 `QPalette`，管住样式表覆盖不到的原生控件：下拉箭头、菜单、滚动条、工具提示 |
+| 样式表 | `theme.qss`（经 `theme.qrc` 编译进 `:/theme.qss`） | 卡片底色/圆角/描边、字号层级、按钮主次与悬停、状态胶囊、数值配色 |
+
+几个具体做法：
+
+- **卡片式分组**：`QFrame#deviceCard`、`chartCard`、`glCard`、`dataCard` 用 `background + border + border-radius` 做成卡片，窗口底色用 `qlineargradient` 竖向渐变；
+- **按钮分级**：主操作「打开串口」实心蓝，`查询一次` 青色描边，`清空数据` 红色描边——靠 `#objectName` 区分，不改控件类型；
+- **状态联动用动态属性**：连接后给按钮设 `connected=true`，再用 `style()->unpolish/polish` 触发重绘，QSS 里 `#openButton[connected="true"]` 才会生效（只改属性不 repolish 是不刷新的）；
+- **数字从 `QLCDNumber` 换成 `QLabel`**：LCD 段码在深色底上对小尺寸不友好，换成 Consolas 40 px + `%1` 四位零填充，读数稳定、单位不左右跳；
+- **QChart 深色化**：`setBackgroundVisible(false)` 让图表透明露出卡片底色，坐标轴 label/grid/line 全换深色，x 轴标签隐藏（滚动窗口下数字只会晃眼），y 轴 `%d`。
+- **OpenGL 控件融入卡片**：`glClearColor` 取卡片同色 `#0d1626`，再加一套最简着色器画背景网格（顶点已是 NDC，静态 VBO，每帧只多一次 draw call）。
+
+> ⚠️ 踩坑记录：卡片头部的 `QLabel` 默认 sizePolicy 带 `GrowFlag`，会把多余高度吃掉，导致徽标被拉成大方块、下面的波形区被顶下去。修法是标题/徽标/脚注一律 `vsizetype=Fixed`、波形控件 `Expanding`，并在代码里 `chartCardLayout->setStretch(1, 1)`、`glCardLayout->setStretch(1, 1)`。
+
+---
+
+## OpenGL 波形 vs QtCharts（同一份数据的双路对比）
+
+界面上并排放了两个波形控件，**吃完全相同的采样数据**，用来量化两条渲染路径的差距：
+
+| 分组 | 实现 | 每帧做什么 |
+|---|---|---|
+| QtCharts（CPU 光栅化） | `QLineSeries` + `QChartView` | 每个点一个绘图项，`append` / `removePoints` 维护内部索引，CPU 逐段光栅化 |
+| OpenGL（GPU + 着色器） | `QOpenGLWidget` + VBO + GLSL 330 | 点写进环形缓冲，`glBufferSubData` 只传增量，`glDrawArrays` 一次画完 |
+
+![双路波形对比](docs/gl-vs-chart.png)
+
+### 实现要点（`waveformglwidget.h/.cpp`）
+
+- **3.3 Core Profile + VAO**：`initializeGL()` 里编译 shader、建 VAO/VBO，`paintGL()` 里只绑定 + 画
+- **环形顶点缓冲**：65536 个 `vec2`（512 KB），x 分量固定为槽位号，数据只覆盖 y
+- **增量上传**：记录上次绘制后的写入区间，只 `glBufferSubData` 这一小段；写指针跨过缓冲尾时拆成两段上传
+- **坐标变换在顶点着色器**：`(槽位 - u_left) / u_span` 映射到 NDC，滚动时只改 uniform，不重建顶点
+- **跨尾绘制**：可见窗口跨过缓冲尾时，第二段整体 `+65536` 后直接接在第一段后面，两次 `glDrawArrays`
+- **线宽**：Core profile 下 `glLineWidth > 1` 不可靠，用三次 `u_yOffset` 微偏移叠出约 2.5 px；边缘靠 4× MSAA
+- **60 Hz 固定节拍重绘**：滚动动画与数据到达解耦，数据停 800 ms 后自动停表，不空转
+- **背景网格**：第二套最简着色器（顶点已是 NDC，`gl_Position = vec4(aPos, 0, 1)`）+ 静态 VBO（5 横 6 竖 `GL_LINES`），每帧只多一次 draw call，视觉上与左侧 QtCharts 的网格对齐
+
+### 实测数据（AMD Radeon 780M / Windows 11 / Qt 6.8.3）
+
+| 压测档位 | 数据率 | QtCharts | OpenGL |
+|---|---|---|---|
+| 关 | 串口 5 帧/秒 | 5 fps / <1 ms | 5 fps / 0.02 ms |
+| 低 | ≈ 2 000 点/秒 | 67~73 fps / **6.2~6.6 ms/帧** | 55~63 fps / **0.022~0.024 ms/帧** |
+| 中 | ≈ 3 000 点/秒（60 点/批） | 30 fps / **25 ms/帧** | 24 fps（被拖住） |
+| 高 | ≈ 25 000 点/秒（500 点/批） | 4.5 fps / **210 ms/帧** | 4 fps（被拖住） |
+
+**结论要说清楚**：单帧成本差 **300 倍以上**（6.2 ms vs 0.022 ms），但中/高档两边 fps 会一起掉——因为两个控件在**同一个 UI 线程**，QtCharts 每帧占 25~210 ms 把事件循环堵死，GPU 那条路根本没机会提交。
+
+这正是最该记住的一点：**换 GPU 只解决了"画"，没解决"数据维护 + 事件循环阻塞"**。真要撑住高采样率，得把 QtCharts 移出关键路径（不画、降采样、或换掉），否则 GPU 再快也被拖平。
+
+### 无人值守自测
+
+```bash
+# 启动即开压测、每秒打印帧率、6 秒后退出
+AO_SELFTEST=6 AO_STRESS_LEVEL=1 ./AoMonitor.exe
+
+# 顺便抓图（窗口整图 + GL 控件单独一帧）
+AO_SELFTEST=6 AO_STRESS_LEVEL=1 AO_SCREENSHOT=D:/tmp/shot.png ./AoMonitor.exe
+```
+
+`AO_STRESS_LEVEL`：1 低 / 2 中 / 3 高。手动用时点「压测」按钮循环切档。
 
 ---
 
@@ -159,6 +245,8 @@ cmake --build build-release
 
 配置期若打印 `Configuring with Qt 6.8.3 (major 6)`，说明找对了 Qt。
 
+> 改配色：直接编辑 `theme.qss` 后重新构建即可 —— `theme.qrc` + `set(CMAKE_AUTORCC ON)` 会自动把它编进 `:/theme.qss`，不需要额外的部署步骤。
+
 ### Linux
 
 ```bash
@@ -209,11 +297,14 @@ sudo usermod -aG dialout $USER
 
 ```
 AOMonitor/
-├── CMakeLists.txt          # Qt6 + SerialPort + Charts + Sql
-├── main.cpp                # QApplication + 主窗口
-├── mainwindow.h/.cpp       # 全部业务逻辑：串口、切帧、图表、数据库、导出
-├── mainwindow.ui           # 布局管理器（QVBoxLayout + QGridLayout），chartArea 提升为 QChartView
+├── CMakeLists.txt          # Qt6 + SerialPort + Charts + Sql + OpenGL + OpenGLWidgets，AUTORCC 打包主题
+├── main.cpp                # QApplication + applyTheme()（Fusion + 深色 QPalette + theme.qss）
+├── mainwindow.h/.cpp       # 全部业务逻辑：串口、切帧、图表深色化、OpenGL 双路、数据库、导出
+├── mainwindow.ui           # 卡片式布局；chartArea 提升为 QChartView，glArea 提升为 WaveformGLWidget
+├── theme.qss / theme.qrc   # 界面主题（卡片、圆角、字号、按钮主次、状态胶囊），编译进 :/theme.qss
+├── waveformglwidget.h/.cpp # QOpenGLWidget 波形：VAO + 环形 VBO + GLSL 330 + 网格 + 60Hz 重绘 + 帧率统计
 ├── AoMonitor_zh_CN.ts      # 中文翻译源
+├── dist/                   # windeployqt 打包产物（免安装即用）
 └── README.md
 ```
 
@@ -223,14 +314,18 @@ AOMonitor/
 - **对象树管理内存**：`m_serial = new QSerialPort(this)`，父对象析构自动回收，`~MainWindow` 只 `delete ui`。
 - **`m_pendingLog` 标志法**：点「查询一次」置位，下一帧解析成功即入库并清标志——200 ms 自动帧照常显示但不落库。
 - **平台无关**：串口名走 `QSerialPortInfo::availablePorts()` 枚举，不硬编码 `COM4`，同一份代码 Windows/Linux 都能跑。
+- **样式与逻辑解耦**：QSS 只按 objectName 选择器改观感，改主题不碰业务代码；`theme.qss` 走 Qt 资源编译进 exe，不额外增加部署文件。
 
 ---
 
 ## Roadmap
 
+- [x] 深色主题 / 卡片式布局
+- [x] OpenGL + GLSL 波形渲染与帧率对比
 - [ ] 波形支持暂停 / 缩放 / 多曲线
 - [ ] 按时间段查询历史数据并回放
 - [ ] 采集参数可配置（上报周期、量程标定）
+- [ ] 浅色 / 深色主题切换
 - [ ] 打包安装程序（Inno Setup）
 
 ---

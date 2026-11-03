@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "waveformglwidget.h"
 
 #include <QSerialPortInfo>
 #include <QSqlDatabase>
@@ -11,6 +12,15 @@
 #include <QMessageBox>
 #include <QFile>
 #include <QTextStream>
+#include <QTimer>
+#include <QtMath>
+#include <QWindow>
+#include <QFont>
+#include <QMargins>
+#include <QPen>
+#include <QStyle>
+
+#include <cstdio>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -31,18 +41,36 @@ MainWindow::MainWindow(QWidget *parent)
 
     refreshPorts();     // 启动时先扫一遍串口
     initDatabase();     // 打开 SQLite + 建表（仅启动时一次）
+    setConnectionUi(false, QStringLiteral("串口未连接"));
 
     // ---- 波形图 ----
+    // 背景交给卡片，图表本身透明；配色按深色主题调，避免白底刺眼
     m_series = new QLineSeries(this);
+    m_series->setPen(QPen(QColor(0x38, 0xbd, 0xf8), 2));
+
     auto *chart = new QChart();
     chart->addSeries(m_series);
     chart->legend()->hide();
-    chart->setTitle(QStringLiteral("AO 光照值"));
+    chart->setBackgroundVisible(false);
+    chart->setPlotAreaBackgroundVisible(false);
+    chart->setAnimationOptions(QChart::NoAnimation);      // 实时波形不要动画，省 CPU
+    chart->setMargins(QMargins(0, 6, 0, 0));
 
     m_axisX = new QValueAxis(this);
     m_axisX->setRange(0, 300);                      // 横轴：最近 300 个点
+    m_axisX->setLabelsVisible(false);               // 滚动窗口没有固定时间轴，标数字只会晃眼
+    m_axisX->setGridLineVisible(false);
+    m_axisX->setLinePenColor(QColor(0x26, 0x35, 0x4f));
+
     auto *axisY = new QValueAxis(this);
     axisY->setRange(0, 4095);                       // 纵轴：12 位 ADC 满量程
+    axisY->setTickCount(5);
+    axisY->setLabelFormat(QStringLiteral("%d"));
+    axisY->setGridLineColor(QColor(0x1b, 0x27, 0x40));
+    axisY->setLinePenColor(QColor(0x26, 0x35, 0x4f));
+    axisY->setLabelsColor(QColor(0x7f, 0x92, 0xb4));
+    axisY->setLabelsFont(QFont(QStringLiteral("Consolas"), 8));
+
     chart->addAxis(m_axisX, Qt::AlignBottom);
     chart->addAxis(axisY, Qt::AlignLeft);
     m_series->attachAxis(m_axisX);
@@ -50,8 +78,69 @@ MainWindow::MainWindow(QWidget *parent)
 
     ui->chartArea->setChart(chart);
     ui->chartArea->setRenderHint(QPainter::Antialiasing);
+    ui->chartArea->setFrameShape(QFrame::NoFrame);
+    ui->chartArea->setStyleSheet(QStringLiteral("background: transparent; border: none;"));
+
+    // ---- OpenGL 波形：与 QtCharts 并排，喂同一份数据 ----
+    m_glWidget = ui->glArea;
+    m_glWidget->setWindowSize(300);          // 窗口点数与图表一致，才有可比性
+    ui->chartSplitLayout->setStretch(0, 1);  // 图表与 GL 各占一半；不设 stretch 时
+    ui->chartSplitLayout->setStretch(1, 1);  // GL 控件的 sizeHint 为 0，宽度会被压成 0
+    ui->chartCardLayout->setStretch(1, 1);   // 卡片里第 1 项是波形本体：多余高度全给它，
+    ui->glCardLayout->setStretch(1, 1);      // 否则会被上下两行文字分走，波形区留白
+
+    connect(m_glWidget, &WaveformGLWidget::glReady, this, [this](const QString &info){
+        ui->statusbar->showMessage(info, 8000);   // 启动时打印 GL 版本/渲染器，出问题好排查
+        fprintf(stderr, "[gl] %s\n", info.toUtf8().constData());
+        fflush(stderr);
+    });
+    connect(m_glWidget, &WaveformGLWidget::statsUpdated, this, [this](double fps, double ms){
+        m_glFps = fps;
+        m_glMs  = ms;
+        updatePerfLabel();
+    });
+
+    // QtCharts 内部 paint 无法直接计时，改为数 viewport 的 Paint 事件算真实刷新率
+    m_chartViewport = ui->chartArea->viewport();
+    m_chartViewport->installEventFilter(this);
+    m_chartTimer.start();
+    updatePerfLabel();
+
     // 串口每来一批字节就触发 onReadyRead（相当于 STM32 的接收中断）
     connect(m_serial, &QSerialPort::readyRead, this, &MainWindow::onReadyRead);
+
+    // 自测模式（无人值守验证）：AO_SELFTEST=<秒数>，自动开压测、每秒打一次帧率、到点退出
+    const int selfTestSec = qEnvironmentVariableIntValue("AO_SELFTEST");
+    if (selfTestSec > 0) {
+        const int lv = qEnvironmentVariableIntValue("AO_STRESS_LEVEL");   // 1 低 / 2 中 / 3 高
+        const int clicks = (lv >= 1 && lv <= 3) ? lv : 1;
+        QTimer::singleShot(500, this, [this, clicks]() {
+            for (int i = 0; i < clicks; ++i)
+                on_stressButton_clicked();
+        });
+
+        auto *report = new QTimer(this);
+        report->setInterval(1000);
+        connect(report, &QTimer::timeout, this, [this]() {
+            fprintf(stderr, "[selftest] QtCharts=%.1f fps / %.2f ms    OpenGL=%.1f fps / %.3f ms\n",
+                    m_chartFps, m_chartMs, m_glFps, m_glMs);
+            fflush(stderr);
+        });
+        report->start();
+
+        QTimer::singleShot(selfTestSec * 1000, qApp, &QCoreApplication::quit);
+
+        // 可选：退出前抓图验证渲染（AO_SCREENSHOT=<路径>）
+        const QString shot = qEnvironmentVariable("AO_SCREENSHOT");
+        if (!shot.isEmpty()) {
+            QTimer::singleShot(selfTestSec * 1000 - 300, this, [this, shot]() {
+                grab().save(shot);
+                m_glWidget->grabFramebuffer().save(shot + ".gl.png");
+                fprintf(stderr, "[selftest] 截图已保存：%s\n", shot.toUtf8().constData());
+                fflush(stderr);
+            });
+        }
+    }
 }
 
 MainWindow::~MainWindow()
@@ -182,7 +271,7 @@ void MainWindow::on_openButton_clicked()
     if (m_serial->isOpen()) {                    // 已开着 → 这次点击是"关闭"
         m_serial->close();
         m_rx.clear();
-        ui->openButton->setText(QStringLiteral("打开串口"));
+        setConnectionUi(false, QStringLiteral("串口未连接"));
         ui->statusbar->showMessage(QStringLiteral("串口已关闭"), 3000);
         return;
     }
@@ -211,13 +300,29 @@ void MainWindow::on_openButton_clicked()
             why = QStringLiteral("设备不存在（可能已被拔出）");
         else
             why = m_serial->errorString();
+        setConnectionUi(false, QStringLiteral("打开失败"));
         ui->statusbar->showMessage(QStringLiteral("打开失败：%1").arg(why), 5000);
         return;
     }
 
-    ui->openButton->setText(QStringLiteral("关闭串口"));
+    setConnectionUi(true, QStringLiteral("%1 @ %2")
+                            .arg(portName, ui->botelvBox->currentText()));
     ui->statusbar->showMessage(QStringLiteral("%1 @ %2 已打开")
                                    .arg(portName, ui->botelvBox->currentText()));
+}
+
+// 状态胶囊与"打开/关闭串口"按钮同步；connected 是动态属性，改完必须重新抛光
+void MainWindow::setConnectionUi(bool connected, const QString &detail)
+{
+    ui->statusDot->setStyleSheet(connected ? QStringLiteral("color:#22c55e;")
+                                           : QStringLiteral("color:#5b6b87;"));
+    ui->statusLabel->setText(detail);
+    ui->openButton->setText(connected ? QStringLiteral("关闭串口")
+                                      : QStringLiteral("打开串口"));
+    ui->openButton->setProperty("connected", connected);
+    ui->openButton->style()->unpolish(ui->openButton);
+    ui->openButton->style()->polish(ui->openButton);
+    ui->openButton->update();
 }
 
 // ---------- 主动查询一帧 ----------
@@ -232,6 +337,12 @@ void MainWindow::on_searchButton_clicked()
     // 置位标志 → 下一帧解析成功即入库（只记"查询一次"的值，不记 200ms 自动帧）
     m_pendingLog = true;
     m_serial->write("?");
+}
+
+// 4 位定宽显示（12 位 ADC 最大 4095），像仪表一样零填充，位数变化时单位不会左右跳
+static QString formatValue(qint64 v)
+{
+    return QStringLiteral("%1").arg(v, 4, 10, QLatin1Char('0'));
 }
 
 // ---------- 收数据与切帧 ----------
@@ -266,21 +377,104 @@ void MainWindow::parseFrames()
         if (!ok) continue;                              // 解析失败的坏帧，不显示
 
         m_lastValue = value;
-        ui->AONumber->display(static_cast<double>(value));
+        ui->AONumber->setText(formatValue(value));
 
         // 仅"查询一次"请求的下一帧才入库 + 刷新 AONumber_2
         if (m_pendingLog) {
             m_pendingLog = false;
             insertRecord(value);
-            ui->AONumber_2->display(static_cast<double>(value));
+            ui->AONumber_2->setText(formatValue(value));
         }
-        m_series->append(m_pointCount++, value);
+        addSample(value);                               // 同一份数据喂给两个波形控件
+    }
+}
 
-        if (m_series->count() > 300) {                  // 滚动窗口：超过 300 点
-            m_series->removePoints(0, m_series->count() - 300);
-            m_axisX->setRange(m_series->at(0).x(),      // 窗口左端 = 最老点的 x
-                              m_series->at(0).x() + 299); // 右端跟着左移，窗口宽度不变
+// ---------- 数据分发：两份波形吃同一份数据 ----------
+
+void MainWindow::addSample(qint64 value)
+{
+    // QtCharts 路线：每点一个 QGraphicsItem，append/removePoints 都要维护内部索引
+    // 这段耗时是 QtCharts 的固有成本，单独累计出来作为"每帧处理成本"的量化指标
+    m_ingestTimer.start();
+    m_series->append(m_pointCount++, value);
+    if (m_series->count() > 300) {
+        m_series->removePoints(0, m_series->count() - 300);
+        m_axisX->setRange(m_series->at(0).x(),         // 窗口左端 = 最老点的 x
+                          m_series->at(0).x() + 299);  // 右端跟着左移，窗口宽度不变
+    }
+    m_chartUs += m_ingestTimer.nsecsElapsed() / 1000;
+
+    // OpenGL 路线：只写进环形缓冲，绘制时一次 subData + 一次 drawArrays
+    if (m_glWidget)
+        m_glWidget->appendValue(value);
+}
+
+// ---------- 帧率统计 ----------
+
+bool MainWindow::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == m_chartViewport && event->type() == QEvent::Paint) {
+        ++m_chartFrames;
+        const qint64 ms = m_chartTimer.elapsed();
+        if (ms >= 500) {                                // 500ms 一个统计窗口，避免抖动
+            m_chartFps = m_chartFrames * 1000.0 / double(ms);
+            m_chartMs  = m_chartFrames > 0
+                             ? double(m_chartUs) / 1000.0 / double(m_chartFrames)
+                             : 0.0;
+            m_chartFrames = 0;
+            m_chartUs = 0;
+            m_chartTimer.restart();
+            updatePerfLabel();
         }
     }
+    return QMainWindow::eventFilter(watched, event);
+}
+
+void MainWindow::updatePerfLabel()
+{
+    auto num = [](double v) {
+        return v >= 10.0 ? QString::number(v, 'f', 1) : QString::number(v, 'f', 2);
+    };
+    // 两个卡片脚注各显示自己的数字，视线不用来回跳
+    ui->chartStat->setText(QStringLiteral("300 点窗口　%1 fps　%2 ms/帧")
+                               .arg(num(m_chartFps), num(m_chartMs)));
+    ui->glStat->setText(QStringLiteral("300 点窗口　%1 fps　%2 ms/帧")
+                            .arg(num(m_glFps), QString::number(m_glMs, 'f', 3)));
+}
+
+// ---------- 压测 ----------
+
+void MainWindow::on_stressButton_clicked()
+{
+    // 三档压测：点一次升一档，循环。档位越高，QtCharts 退化越明显。
+    //   低 ≈ 2k 点/秒   中 ≈ 3k 点/秒（单次 60 点）   高 ≈ 25k 点/秒（单次 500 点）
+    static const int    kInterval[] = { 5, 5, 20, 20 };
+    static const int    kBatch[]    = { 0, 10, 60, 500 };
+    static const char  *kLabel[]    = { "关", "低", "中", "高" };
+
+    m_stressLevel = (m_stressLevel + 1) % 4;
+
+    if (!m_stressTimer) {
+        m_stressTimer = new QTimer(this);
+        connect(m_stressTimer, &QTimer::timeout, this, [this]() {
+            qint64 v = 0;
+            for (int i = 0; i < m_stressBatch; ++i) {
+                const double t = double(m_stressSeq++) * 0.03;   // 相位步长固定，波形才看得出起伏
+                v = qBound(qint64(0), qint64(2048 + 1600 * qSin(t) + 200 * qSin(t * 7.3)), qint64(4095));
+                addSample(v);
+            }
+            ui->AONumber->setText(formatValue(v));              // 压测时大数字也跟着跳
+        });
+    }
+
+    m_stressBatch = kBatch[m_stressLevel];
+    if (m_stressLevel == 0) {
+        m_stressTimer->stop();
+    } else {
+        m_stressTimer->setInterval(kInterval[m_stressLevel]);
+        m_stressTimer->start();
+    }
+    ui->stressButton->setText(QStringLiteral("压测：%1")
+                                  .arg(QString::fromUtf8(kLabel[m_stressLevel])));
 }
 
