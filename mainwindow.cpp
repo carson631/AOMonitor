@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "waveformglwidget.h"
+#include "frameparser.h"
 
 #include <QSerialPortInfo>
 #include <QSqlDatabase>
@@ -26,8 +27,13 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , m_serial(new QSerialPort(this))   // 挂到对象树，窗口析构时自动删除
+    , m_parser(new FrameParser(this))   // 切帧与 UI 解耦：Parser 发信号，这里只管展示
 {
     ui->setupUi(this);
+
+    // 每切出一帧有效数据 → 显示、按需入库、喂两个波形
+    connect(m_parser, &FrameParser::frameParsed,
+            this, &MainWindow::onFrameParsed);
 
     // 波特率下拉框：常用值，默认 9600（与 STM32 端 Serial.c 一致）
     const QList<qint32> bauds = {
@@ -270,7 +276,7 @@ void MainWindow::on_openButton_clicked()
 {
     if (m_serial->isOpen()) {                    // 已开着 → 这次点击是"关闭"
         m_serial->close();
-        m_rx.clear();
+        m_parser->reset();
         setConnectionUi(false, QStringLiteral("串口未连接"));
         ui->statusbar->showMessage(QStringLiteral("串口已关闭"), 3000);
         return;
@@ -290,7 +296,7 @@ void MainWindow::on_openButton_clicked()
     m_serial->setStopBits(QSerialPort::OneStop);        // 1
     m_serial->setFlowControl(QSerialPort::NoFlowControl);
 
-    m_rx.clear();                                       // 不带上一轮的残留数据
+    m_parser->reset();                                  // 不带上一轮的残留数据
     if (!m_serial->open(QIODevice::ReadWrite)) {
         // 按错误类型给排查提示，和 Windows 上"拒绝访问"的经验对上
         QString why;
@@ -340,53 +346,27 @@ void MainWindow::on_searchButton_clicked()
 }
 
 // 4 位定宽显示（12 位 ADC 最大 4095），像仪表一样零填充，位数变化时单位不会左右跳
-static QString formatValue(qint64 v)
-{
-    return QStringLiteral("%1").arg(v, 4, 10, QLatin1Char('0'));
-}
+// （实现挪进 FrameParser::formatValue，逻辑类可测）
 
 // ---------- 收数据与切帧 ----------
 
 void MainWindow::onReadyRead()
 {
-    m_rx += m_serial->readAll();                        // 先无脑累积
-    if (m_rx.size() > 4096)                             // 防止坏波特率下无限膨胀
-        m_rx.remove(0, m_rx.size() - 4096);
-    parseFrames();
+    m_parser->feed(m_serial->readAll());                // 缓冲、切帧都在 Parser 里
 }
 
-void MainWindow::parseFrames()
+void MainWindow::onFrameParsed(qint64 value)
 {
-    for (;;) {
-        int start = m_rx.indexOf('$');
-        if (start < 0) { m_rx.clear(); return; }        // 纯噪声，全丢
-        if (start > 0)  m_rx.remove(0, start);          // 丢帧头之前的垃圾
+    m_lastValue = value;
+    ui->AONumber->setText(FrameParser::formatValue(value));
 
-        int end = m_rx.indexOf('#');
-        if (end < 0) return;                            // 半包：留着等下一批数据
-
-        QByteArray frame = m_rx.left(end + 1);          // "$DATA,xxxx#"
-        m_rx.remove(0, end + 1);
-
-        int comma = frame.indexOf(',');                 // $DATA,<数值>#
-        if (comma < 0) continue;                        // 格式不对，丢弃这帧
-        bool ok = false;
-        qint64 value = frame.mid(comma + 1,
-                                 frame.size() - comma - 2)  // 去掉结尾 '#'
-                          .trimmed().toLongLong(&ok);
-        if (!ok) continue;                              // 解析失败的坏帧，不显示
-
-        m_lastValue = value;
-        ui->AONumber->setText(formatValue(value));
-
-        // 仅"查询一次"请求的下一帧才入库 + 刷新 AONumber_2
-        if (m_pendingLog) {
-            m_pendingLog = false;
-            insertRecord(value);
-            ui->AONumber_2->setText(formatValue(value));
-        }
-        addSample(value);                               // 同一份数据喂给两个波形控件
+    // 仅"查询一次"请求的下一帧才入库 + 刷新 AONumber_2
+    if (m_pendingLog) {
+        m_pendingLog = false;
+        insertRecord(value);
+        ui->AONumber_2->setText(FrameParser::formatValue(value));
     }
+    addSample(value);                                   // 同一份数据喂给两个波形控件
 }
 
 // ---------- 数据分发：两份波形吃同一份数据 ----------
@@ -463,7 +443,7 @@ void MainWindow::on_stressButton_clicked()
                 v = qBound(qint64(0), qint64(2048 + 1600 * qSin(t) + 200 * qSin(t * 7.3)), qint64(4095));
                 addSample(v);
             }
-            ui->AONumber->setText(formatValue(v));              // 压测时大数字也跟着跳
+            ui->AONumber->setText(FrameParser::formatValue(v));  // 压测时大数字也跟着跳
         });
     }
 
