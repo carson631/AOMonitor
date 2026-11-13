@@ -16,6 +16,7 @@ QT_END_NAMESPACE
 class WaveformGLWidget;
 class QTimer;
 class FrameParser;
+class TcpClient;
 
 class MainWindow : public QMainWindow
 {
@@ -36,6 +37,7 @@ private slots:
     void on_exportButton_clicked();     // 导出数据库为 CSV
     void on_clearButton_clicked();      // 清空数据库
     void on_stressButton_clicked();     // 压测开关：合成数据灌给两边，放大性能差异
+    void on_tcpButton_clicked();        // 连接/断开 TCP 数据源（二次点击为断开）
     void onReadyRead();                 // 收到字节 → 喂给 FrameParser 切帧
     void onFrameParsed(qint64 value);   // FrameParser 切出一帧 → 显示/入库/喂波形
 
@@ -47,9 +49,11 @@ private:
     void addSample(qint64 value);       // 同一份数据同时喂给 QtCharts 与 OpenGL 波形
     void updatePerfLabel();             // 刷新两侧卡片的帧率/耗时文字
     void setConnectionUi(bool connected, const QString &detail);   // 状态胶囊 + 打开按钮联动
+    void setSourceUi(int index);        // 数据源切换：串口组 / TCP 组互斥启停
 
     Ui::MainWindow *ui;
     QSerialPort *m_serial = nullptr;    // 以 this 为父对象，窗口析构自动回收
+    TcpClient   *m_tcp    = nullptr;    // TCP 数据源：与串口同级，喂同一个 FrameParser
     FrameParser *m_parser = nullptr;    // 切帧逻辑在纯逻辑类里，可脱离界面单测
     qint64 m_lastValue = -1;            // 最近一次成功解析的光照值
     QLineSeries *m_series = nullptr;

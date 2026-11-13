@@ -130,20 +130,69 @@
        <property name="spacing">
         <number>10</number>
        </property>
-       <item>
-        <widget class="QLabel" name="label_2">
+      <item>
+       <widget class="QLabel" name="sourceLabel">
+        <property name="text">
+         <string>数据源</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QComboBox" name="sourceBox">
+        <property name="minimumSize">
+         <size>
+          <width>90</width>
+          <height>32</height>
+         </size>
+        </property>
+        <item>
          <property name="text">
           <string>串口</string>
          </property>
-        </widget>
-       </item>
+        </item>
+        <item>
+         <property name="text">
+          <string>TCP</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+      <item>
+       <widget class="QFrame" name="hSep1">
+        <property name="minimumSize">
+         <size>
+          <width>1</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>1</width>
+          <height>16777215</height>
+         </size>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::NoFrame</enum>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="label_2">
+        <property name="text">
+         <string>串口</string>
+        </property>
+       </widget>
+      </item>
        <item>
         <widget class="QComboBox" name="chuankouBox">
          <property name="minimumSize">
           <size>
-           <width>280</width>
+           <width>170</width>
            <height>32</height>
           </size>
+         </property>
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Expanding" vsizetype="Fixed"/>
          </property>
         </widget>
        </item>
@@ -181,7 +230,7 @@
         <widget class="QComboBox" name="botelvBox">
          <property name="minimumSize">
           <size>
-           <width>120</width>
+           <width>88</width>
            <height>32</height>
           </size>
          </property>
@@ -199,6 +248,97 @@
          <property name="orientation">
           <enum>Qt::Horizontal</enum>
          </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Fixed</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>12</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QFrame" name="hSep2">
+         <property name="minimumSize">
+          <size>
+           <width>1</width>
+           <height>0</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>1</width>
+           <height>16777215</height>
+          </size>
+         </property>
+         <property name="frameShape">
+          <enum>QFrame::NoFrame</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="hostLabel">
+         <property name="text">
+          <string>地址</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="hostEdit">
+         <property name="minimumSize">
+          <size>
+           <width>120</width>
+           <height>32</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>127.0.0.1</string>
+         </property>
+         <property name="placeholderText">
+          <string>模拟器地址</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="portLabel">
+         <property name="text">
+          <string>端口</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QSpinBox" name="portSpin">
+         <property name="minimumSize">
+          <size>
+           <width>90</width>
+           <height>32</height>
+          </size>
+         </property>
+         <property name="minimum">
+          <number>1</number>
+         </property>
+         <property name="maximum">
+          <number>65535</number>
+         </property>
+         <property name="value">
+          <number>9000</number>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="tcpButton">
+         <property name="text">
+          <string>连接 TCP</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="deviceSpacer3">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
          <property name="sizeHint" stdset="0">
           <size>
            <width>40</width>
@@ -206,13 +346,6 @@
           </size>
          </property>
         </spacer>
-       </item>
-       <item>
-        <widget class="QLabel" name="deviceHint">
-         <property name="text">
-          <string>8 数据位 · 无校验 · 1 停止位</string>
-         </property>
-        </widget>
        </item>
       </layout>
      </widget>

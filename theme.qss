@@ -68,9 +68,47 @@ QFrame#glCard {
     border-radius: 12px;
 }
 
-QFrame#vSep {
+QFrame#vSep,
+QFrame#hSep1,
+QFrame#hSep2 {
     background: #22314f;
     border: none;
+}
+
+/* ---------------- TCP 地址/端口输入 ---------------- */
+
+QLineEdit#hostEdit,
+QSpinBox#portSpin {
+    background: #0f1830;
+    border: 1px solid #26334f;
+    border-radius: 8px;
+    padding: 4px 10px;
+    color: #e8eefb;
+    font-family: Consolas, "DejaVu Sans Mono", "Courier New", monospace;
+    selection-background-color: #2b4a75;
+}
+
+QLineEdit#hostEdit:focus,
+QSpinBox#portSpin:focus {
+    border: 1px solid #38bdf8;
+}
+
+QLineEdit#hostEdit:disabled,
+QSpinBox#portSpin:disabled {
+    color: #55648a;
+    border-color: #1c2740;
+}
+
+QSpinBox#portSpin::up-button,
+QSpinBox#portSpin::down-button {
+    background: #16223a;
+    border: none;
+    width: 16px;
+}
+
+QSpinBox#portSpin::up-button:hover,
+QSpinBox#portSpin::down-button:hover {
+    background: #1f2d4a;
 }
 
 /* ---------------- 卡片内文字 ---------------- */
@@ -134,10 +172,7 @@ QLabel#unitLabel2 {
     padding-bottom: 6px;
 }
 
-QLabel#deviceHint {
-    font-size: 12px;
-    color: #6b7c9c;
-}
+/* deviceHint 已从布局移除，说明文字改为设备卡片 tooltip（防窗口缩小时布局溢出重叠） */
 
 /* ---------------- 按钮 ---------------- */
 
@@ -181,6 +216,16 @@ QPushButton#openButton[connected="true"] {
     background: #3a1f2a;
     border-color: #7f3b4c;
     color: #ffb0bf;
+}
+
+/* 禁用态必须写在这里：#openButton 的蓝色比全局 QPushButton:disabled 更具体，
+   不显式覆盖的话切到 TCP 后"打开串口"仍是亮蓝色，看着像能点 */
+QPushButton#openButton:disabled,
+QPushButton#tcpButton:disabled {
+    background: #141d2f;
+    border-color: #1c2740;
+    color: #54637f;
+    font-weight: 400;
 }
 
 QPushButton#searchButton {

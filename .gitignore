@@ -85,3 +85,6 @@ CMakeLists.txt.user*
 
 # 发布产物
 /dist/
+
+# gcovr 覆盖率报告（827KB 内联 CSS，本地按需重新生成）
+/docs/coverage/

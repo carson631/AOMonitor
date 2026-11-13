@@ -2,6 +2,7 @@
 #include "ui_mainwindow.h"
 #include "waveformglwidget.h"
 #include "frameparser.h"
+#include "tcpclient.h"
 
 #include <QSerialPortInfo>
 #include <QSqlDatabase>
@@ -27,6 +28,7 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , m_serial(new QSerialPort(this))   // 挂到对象树，窗口析构时自动删除
+    , m_tcp(new TcpClient(this))        // TCP 数据源：与串口同级，喂同一个 FrameParser
     , m_parser(new FrameParser(this))   // 切帧与 UI 解耦：Parser 发信号，这里只管展示
 {
     ui->setupUi(this);
@@ -114,6 +116,43 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 串口每来一批字节就触发 onReadyRead（相当于 STM32 的接收中断）
     connect(m_serial, &QSerialPort::readyRead, this, &MainWindow::onReadyRead);
+
+    // ---- TCP 数据源：与串口走完全相同的切帧管线 ----
+    // 字节到了喂 FrameParser；连接/断开只切换 UI 状态与解析器清零
+    connect(m_tcp, &TcpClient::bytesReceived, this, [this](const QByteArray &bytes) {
+        m_parser->feed(bytes);
+    });
+    connect(m_tcp, &TcpClient::connected, this, [this](const QString &peer) {
+        m_parser->reset();                              // 不带上一轮残留
+        setConnectionUi(true, QStringLiteral("TCP %1").arg(peer));
+        ui->statusbar->showMessage(QStringLiteral("已连接 %1，等待 $DATA 帧…").arg(peer), 5000);
+    });
+    connect(m_tcp, &TcpClient::disconnected, this, [this]() {
+        setConnectionUi(false, QStringLiteral("TCP 未连接"));
+        ui->statusbar->showMessage(QStringLiteral("TCP 已断开"), 3000);
+    });
+    connect(m_tcp, &TcpClient::errorOccurred, this, [this](const QString &why) {
+        setConnectionUi(false, QStringLiteral("TCP 未连接"));
+        ui->statusbar->showMessage(QStringLiteral("TCP 错误：%1").arg(why), 8000);
+    });
+
+    // 数据源切换：串口组 / TCP 组互斥
+    connect(ui->sourceBox, &QComboBox::currentIndexChanged,
+            this, &MainWindow::setSourceUi);
+    setSourceUi(0);                                     // 启动时按默认项摆好两组控件
+
+    // 自测模式（无人值守验证）：AO_AUTO_TCP=host:port 启动后自动连 TCP 数据源，
+    // 用于与 AOSimulator 做端到端联调（AO_SELFTEST 仍可叠加）
+    const QString autoTcp = qEnvironmentVariable("AO_AUTO_TCP");
+    if (!autoTcp.isEmpty()) {
+        const int colon = autoTcp.lastIndexOf(QLatin1Char(':'));
+        const QString host = colon > 0 ? autoTcp.left(colon) : autoTcp;
+        const quint16 port = colon > 0 ? autoTcp.mid(colon + 1).toUShort() : 9000;
+        QTimer::singleShot(600, this, [this, host, port]() {
+            ui->sourceBox->setCurrentIndex(1);          // 触发 setSourceUi
+            m_tcp->connectTo(host, port);
+        });
+    }
 
     // 自测模式（无人值守验证）：AO_SELFTEST=<秒数>，自动开压测、每秒打一次帧率、到点退出
     const int selfTestSec = qEnvironmentVariableIntValue("AO_SELFTEST");
@@ -323,26 +362,110 @@ void MainWindow::setConnectionUi(bool connected, const QString &detail)
     ui->statusDot->setStyleSheet(connected ? QStringLiteral("color:#22c55e;")
                                            : QStringLiteral("color:#5b6b87;"));
     ui->statusLabel->setText(detail);
-    ui->openButton->setText(connected ? QStringLiteral("关闭串口")
-                                      : QStringLiteral("打开串口"));
-    ui->openButton->setProperty("connected", connected);
-    ui->openButton->style()->unpolish(ui->openButton);
-    ui->openButton->style()->polish(ui->openButton);
-    ui->openButton->update();
+
+    // 当前数据源是 TCP 时，状态胶囊挂的是 tcpButton，别把 openButton 的文案改乱
+    if (ui->sourceBox->currentIndex() == 1) {
+        ui->tcpButton->setText(connected ? QStringLiteral("断开 TCP")
+                                         : QStringLiteral("连接 TCP"));
+    } else {
+        ui->openButton->setText(connected ? QStringLiteral("关闭串口")
+                                          : QStringLiteral("打开串口"));
+        ui->openButton->setProperty("connected", connected);
+        ui->openButton->style()->unpolish(ui->openButton);
+        ui->openButton->style()->polish(ui->openButton);
+        ui->openButton->update();
+    }
+}
+
+// ---------- 数据源切换 ----------
+
+void MainWindow::setSourceUi(int index)
+{
+    const bool serialTab = (index == 0);
+
+    // 两组控件互斥"显示"而不是只禁用：两组合计约 1540px，卡片只有 1160px，
+    // 同时显示会让布局把控件压到重叠（串口下拉框的长文本会糊到"波特率"上）
+    const QList<QWidget *> serialWidgets = {
+        ui->hSep1, ui->label_2, ui->chuankouBox, ui->refreshButton,
+        ui->label_3, ui->botelvBox, ui->openButton, ui->hSep2
+    };
+    for (QWidget *w : serialWidgets)
+        w->setVisible(serialTab);
+
+    const QList<QWidget *> tcpWidgets = {
+        ui->hostLabel, ui->hostEdit, ui->portLabel, ui->portSpin, ui->tcpButton
+    };
+    for (QWidget *w : tcpWidgets)
+        w->setVisible(!serialTab);
+
+    // 右侧说明文字原来占一行宽度，窗口缩小时会引发布局溢出重叠，
+    // 改成卡片 tooltip：信息还在，不占布局
+    ui->deviceCard->setToolTip(serialTab
+        ? QStringLiteral("8 数据位 · 无校验 · 1 停止位")
+        : QStringLiteral("TCP Client · 连 AOSimulator 模拟器"));
+
+    // 切走时把另一路断干净：连接态只允许存在一个数据源
+    if (!serialTab && m_serial->isOpen()) {
+        m_serial->close();
+        m_parser->reset();
+        ui->statusbar->showMessage(QStringLiteral("已切到 TCP，串口已关闭"), 3000);
+    } else if (serialTab && m_tcp->isConnected()) {
+        m_tcp->disconnectFromHost();
+        ui->statusbar->showMessage(QStringLiteral("已切到串口，TCP 已断开"), 3000);
+    }
+
+    // 摆正状态胶囊
+    if (m_serial->isOpen()) {
+        setConnectionUi(true, QStringLiteral("%1 @ %2")
+                                .arg(ui->chuankouBox->currentData().toString(),
+                                     ui->botelvBox->currentText()));
+    } else if (m_tcp->isConnected()) {
+        setConnectionUi(true, QStringLiteral("TCP %1").arg(m_tcp->peer()));
+    } else {
+        setConnectionUi(false, serialTab ? QStringLiteral("串口未连接")
+                                         : QStringLiteral("TCP 未连接"));
+    }
+}
+
+// ---------- 连接 / 断开 TCP ----------
+
+void MainWindow::on_tcpButton_clicked()
+{
+    if (m_tcp->isConnected()) {                 // 已连接 → 这次点击是"断开"
+        m_tcp->disconnectFromHost();
+        return;
+    }
+
+    const QString host = ui->hostEdit->text().trimmed();
+    if (host.isEmpty()) {
+        ui->statusbar->showMessage(QStringLiteral("请先填写模拟器地址"), 3000);
+        return;
+    }
+
+    // connectToHost 是异步的：成功/失败都走 TcpClient 的信号，这里不判断结果
+    ui->statusbar->showMessage(
+        QStringLiteral("正在连接 %1:%2 …").arg(host).arg(ui->portSpin->value()), 5000);
+    m_tcp->connectTo(host, static_cast<quint16>(ui->portSpin->value()));
 }
 
 // ---------- 主动查询一帧 ----------
 
 void MainWindow::on_searchButton_clicked()
 {
-    if (!m_serial->isOpen()) {
-        ui->statusbar->showMessage(QStringLiteral("串口未打开"), 3000);
-        return;
+    // 两个数据源都遵循"收到任意字节立即补发一帧"的约定；
+    // TCP 模式下 AOSimulator 不响应下行字节，但发送本身无害
+    if (m_serial->isOpen()) {
+        m_pendingLog = true;
+        m_serial->write("?");
+    } else if (m_tcp->isConnected()) {
+        m_pendingLog = true;
+        m_tcp->send("?");
+        // 模拟器是单向广播，不理会下行字节；下一帧自然到达时照样入库
+        ui->statusbar->showMessage(
+            QStringLiteral("已发送查询字节，下一帧到达即入库（模拟器不响应下行）"), 4000);
+    } else {
+        ui->statusbar->showMessage(QStringLiteral("串口/TCP 均未连接"), 3000);
     }
-    // STM32 端约定：收到任意字节立即补发一帧 $DATA,<AO>#
-    // 置位标志 → 下一帧解析成功即入库（只记"查询一次"的值，不记 200ms 自动帧）
-    m_pendingLog = true;
-    m_serial->write("?");
 }
 
 // 4 位定宽显示（12 位 ADC 最大 4095），像仪表一样零填充，位数变化时单位不会左右跳

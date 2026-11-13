@@ -182,6 +182,67 @@ $DATA,512#
 
 ---
 
+## TCP 数据源（配合 AOSimulator）
+
+串口之外再开一路 **TCP 客户端**输入，协议完全相同（`$DATA,<AO>#\r\n`），
+收到的字节喂给**同一个 `FrameParser`** —— 波形、大数字、入库、CSV 导出全部复用，
+新增的只有一个连接管理类 `TcpClient`。
+
+```
+[数据源: 串口│TCP] ──► QSerialPort ─┐
+                                    ├─► FrameParser::feed() ─► frameParsed ─► UI/DB
+[数据源: TCP]  ──► TcpClient ───────┘      （切帧逻辑零改动）
+```
+
+### 使用
+
+1. 设备卡片左上角「数据源」选 **TCP**（串口控件组会被隐藏）
+2. 地址 `127.0.0.1`、端口 `9000`，点「连接 TCP」
+3. 状态胶囊变绿显示 `TCP 127.0.0.1:9000`，波形开始滚动
+
+### 与 AOSimulator 联调
+
+```bash
+# 终端 1：模拟器监听 9000，默认恒值 2048，200ms 一帧
+AOSimulator.exe --autostart
+
+# 终端 2：上位机自动连接（免手点，便于脚本化验证）
+set AO_AUTO_TCP=127.0.0.1:9000
+AoMonitor.exe
+```
+
+模拟器的四种坏帧注入可以直接验证上位机的健壮性：
+
+| 模拟器注入 | 上位机应表现 |
+|---|---|
+| 无（恒值/正弦） | 波形连续，帧计数稳定 |
+| 半包（帧切两段） | 不丢帧（缓冲重组成功） |
+| 粘包（3 帧一包） | 一次 `feed` 解析出 3 帧 |
+| 垃圾前缀 / 空值帧 | 坏帧被丢弃，已有波形不中断 |
+
+> 注意：AOSimulator 是**单向广播**，不响应「查询一次」的下行 `?` 字节；
+> 点击后会在状态栏说明，下一帧自然到达时照常入库。
+
+### 两组控件为什么互斥"显示"而不是只禁用
+
+串口组 + TCP 组同时排在设备卡片一行时，最小宽度合计约 **1540px**，
+而卡片只有 **1160px**。早期版本只是 `setEnabled(false)`，结果布局被压到重叠——
+串口下拉框里 `COM5 — 蓝牙链接上的标准串行` 的长文本溢出，糊在「波特率」标签上，
+看起来像「标准波特率」重影（这个坑值得记：**布局溢出时控件会互相覆盖，不是简单挤压**）。
+现在切换时直接 `setVisible()`，一次只放一组，宽度立刻富余。
+
+同一个病根在小窗口下还会复发：窗口缩到最小 1000×680 时，串口组自身也放不下
+（下拉框最小 280 + 波特率 120 + 右侧「8 数据位」说明文字）。对应两处调整：
+
+- `chuankouBox` 最小宽 280 → 170（文本过长时按控件宽度裁切，布局不再被顶爆）
+- `botelvBox` 最小宽 120 → 88
+- 装饰性的「8 数据位 · 无校验 · 1 停止位」从布局里移除，改成设备卡片的 **tooltip**，
+  信息不丢，也不占用那一行宝贵的水平空间
+
+验证方式：`MoveWindow` 把窗口强制设成 1000×680，两种数据源各截一张图确认无重叠。
+
+---
+
 ## 数据存储
 
 SQLite 数据库文件与 exe 同目录（`QCoreApplication::applicationDirPath() + "/ao_data.db"`），首次启动自动建表：
@@ -290,6 +351,7 @@ sudo usermod -aG dialout $USER
 | 数值恒为 0 或 4095 | AO 未接线 / 光敏模块供电异常；用万用表量 AO 对 GND 电压应在 0~3.3V 变化 |
 | 波形不动 | 横轴窗口未跟随数据平移（QtCharts 横轴是真实数值，必须 `setRange(min, min+299)` 整体平移，只改一头会导致新数据落在可视范围外） |
 | Linux 打开串口 `Permission denied` | 未加 `dialout` 组或未重新登录 |
+| TCP「连接被拒绝」 | AOSimulator 没启动或端口不对（默认 9000）；同机环回不受防火墙影响，跨机需放行入站 |
 
 ---
 
@@ -303,6 +365,10 @@ AOMonitor/
 ├── mainwindow.ui           # 卡片式布局；chartArea 提升为 QChartView，glArea 提升为 WaveformGLWidget
 ├── theme.qss / theme.qrc   # 界面主题（卡片、圆角、字号、按钮主次、状态胶囊），编译进 :/theme.qss
 ├── waveformglwidget.h/.cpp # QOpenGLWidget 波形：VAO + 环形 VBO + GLSL 330 + 网格 + 60Hz 重绘 + 帧率统计
+├── tcpclient.h/.cpp        # TCP 数据源：连接管理 + 吐字节，不碰 UI，可与 QTcpServer 环回单测
+├── tests/
+│   ├── test_ao_monitor.cpp # FrameParser 27 用例
+│   └── test_tcpclient.cpp  # TcpClient 7 用例（真实 TCP 环回，不 mock）
 ├── AoMonitor_zh_CN.ts      # 中文翻译源
 ├── dist/                   # windeployqt 打包产物（免安装即用）
 └── README.md
@@ -322,6 +388,7 @@ AOMonitor/
 
 - [x] 深色主题 / 卡片式布局
 - [x] OpenGL + GLSL 波形渲染与帧率对比
+- [x] TCP 数据源（与串口共用 FrameParser，配 AOSimulator 做无硬件回归）
 - [ ] 波形支持暂停 / 缩放 / 多曲线
 - [ ] 按时间段查询历史数据并回放
 - [ ] 采集参数可配置（上报周期、量程标定）
